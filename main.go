@@ -276,107 +276,195 @@ func detectInContent(content string, filePath string) []map[string]interface{} {
 func printDetailedHelp() {
 	fmt.Println(`
 SECRETS SCANNER - Fast Secret Detection Tool
+=============================================
 
 DESCRIPTION:
   A high-performance Go-based tool for detecting secrets, API keys, passwords,
   and sensitive data in source code and configuration files.
 
 USAGE:
-  secrets-scanner [OPTIONS]
+  secrets-scanner [INPUT_OPTIONS] [FILTER_OPTIONS] [OUTPUT_OPTIONS]
 
-INPUT:
-  -path string          Directory or file path to scan (default: ".")
-                        Examples: 
-                          -path ./src
-                          -path /var/www/app
-                          -path config.yaml
+═══════════════════════════════════════════════════════════════════
+INPUT OPTIONS
+═══════════════════════════════════════════════════════════════════
 
-OPTIONS:
-  -severity string      Minimum severity level (default: "HIGH")
-                        Values: CRITICAL, HIGH, MEDIUM, LOW
-                        Example: -severity CRITICAL
+  -path string
+      Directory or file path to scan
+      Default: "." (current directory)
+      Examples:
+        -path ./src
+        -path /var/www/app
+        -path config.yaml
+        -path ./main.go
 
-  -workers int          Number of concurrent worker threads (default: 8)
-                        Auto-detected to CPU cores if set to 0
-                        Example: -workers 16
+═══════════════════════════════════════════════════════════════════
+FILTER OPTIONS (File Extensions)
+═══════════════════════════════════════════════════════════════════
 
-  -include-ext string   Comma-separated file extensions to scan
-                        Overrides default extensions
-                        Example: -include-ext ".go,.js,.py,.yaml"
+  -include-ext string
+      Scan ONLY these file extensions (comma-separated)
+      This OVERRIDES the default extension list
+      Examples:
+        -include-ext ".go"              # Scan only Go files
+        -include-ext ".go,.js,.py"      # Scan Go, JS, Python files
+        -include-ext ".yaml,.yml,.json" # Scan config files
 
-  -exclude-ext string   Comma-separated file extensions to skip
-                        Removes from default or include list
-                        Example: -exclude-ext ".log,.tmp,.md"
+  -exclude-ext string
+      SKIP these file extensions (comma-separated)
+      Removes from default list or from -include-ext list
+      Examples:
+        -exclude-ext ".log"                  # Skip log files
+        -exclude-ext ".log,.tmp,.md"         # Skip logs, temp, markdown
+        -exclude-ext "_test.go,.test.js"     # Skip test files
 
-  -json                 Output results in JSON format (default: false)
-                        Useful for CI/CD integration
-                        Example: -json > results.json
+  DEFAULT EXTENSIONS (used when -include-ext not specified):
+    Code:     .py, .js, .ts, .java, .go, .rs, .php, .cs, .cpp, .c
+    Config:   .json, .yaml, .yml, .xml, .env, .properties
+    Scripts:  .sh, .bash, .ps1, .sql
+    Others:   Dockerfile, Makefile, .env
 
-  -summary              Show summary statistics (default: true)
-                        Use -summary=false to disable
+═══════════════════════════════════════════════════════════════════
+SCAN OPTIONS
+═══════════════════════════════════════════════════════════════════
 
-  -patterns             List all 100+ detection patterns and exit
-                        Example: -patterns
+  -severity string
+      Minimum severity level to report
+      Values: CRITICAL, HIGH, MEDIUM, LOW
+      Default: "HIGH"
+      Example: -severity CRITICAL
 
-  -help                 Show this detailed help message
+  -workers int
+      Number of concurrent worker threads
+      Default: 8
+      Set to 0 for auto-detect (CPU cores)
+      Example: -workers 16
 
-OUTPUT:
-  Console output includes:
-    • Scan progress and file count
-    • Detected secrets with severity, category, file location
-    • Masked secret values (shows first/last 4 chars)
-    • Summary statistics by severity and category
-    • Scan duration
+  -patterns
+      List all 100+ detection patterns and exit
+      Example: -patterns
 
-  JSON Output Structure:
-    {
-      "status": "completed",
-      "findings": [...],
-      "files_scanned": 150,
-      "files_with_secrets": 5,
-      "scan_duration": 2.35,
-      "summary": {
-        "total": 12,
-        "by_severity": {"critical": 2, "high": 5, "medium": 3, "low": 2},
-        "by_category": {"AWS": 3, "GitHub": 2, ...}
+═══════════════════════════════════════════════════════════════════
+OUTPUT OPTIONS
+═══════════════════════════════════════════════════════════════════
+
+  -json
+      Output results in JSON format (default: pretty text)
+      Useful for CI/CD integration and scripting
+      Example: -json > secrets-report.json
+
+  -summary
+      Show summary statistics (default: true)
+      Use -summary=false to disable
+      Example: -summary=false
+
+═══════════════════════════════════════════════════════════════════
+OUTPUT FORMAT
+═══════════════════════════════════════════════════════════════════
+
+CONSOLE OUTPUT includes:
+  • Scan progress with file count and percentage
+  • Each finding with:
+      - Pattern name (e.g., "AWS Access Key ID")
+      - Severity level (CRITICAL/HIGH/MEDIUM/LOW)
+      - Category (Cloud Provider, API Key, etc.)
+      - File path and line number
+      - Description of the secret type
+      - Masked value (****) for security
+  • Summary statistics:
+      - Total files scanned
+      - Files with secrets
+      - Count by severity level
+      - Count by category
+      - Scan duration
+
+JSON OUTPUT STRUCTURE:
+  {
+    "status": "completed",
+    "findings": [
+      {
+        "pattern": "AWS Access Key ID",
+        "severity": "critical",
+        "category": "Cloud Provider",
+        "file": "/path/to/file.go",
+        "line": 42,
+        "matched_value": "AKIA****EXAMPLE",
+        "description": "AWS Access Key ID"
+      }
+    ],
+    "files_scanned": 150,
+    "files_with_secrets": 5,
+    "scan_duration": 2.35,
+    "summary": {
+      "total": 12,
+      "by_severity": {
+        "critical": 2,
+        "high": 5,
+        "medium": 3,
+        "low": 2
+      },
+      "by_category": {
+        "Cloud Provider": 3,
+        "API Key": 2,
+        ...
       }
     }
+  }
 
-EXIT CODES:
-    0  No secrets detected
-    1  Secrets detected or error occurred
+═══════════════════════════════════════════════════════════════════
+EXIT CODES
+═══════════════════════════════════════════════════════════════════
 
-EXAMPLES:
+  0  No secrets detected (success)
+  1  Secrets detected OR error occurred
 
-  Basic scan:
+═══════════════════════════════════════════════════════════════════
+EXAMPLES
+═══════════════════════════════════════════════════════════════════
+
+  Basic scan of current directory:
     ./secrets-scanner
 
-  Scan specific directory with high severity:
-    ./secrets-scanner -path ./src -severity HIGH
+  Scan specific directory:
+    ./secrets-scanner -path ./src
 
   Scan only Go files:
     ./secrets-scanner -include-ext ".go"
 
-  Exclude test files:
-    ./secrets-scanner -exclude-ext "_test.go,.test.js"
+  Scan all code except test files:
+    ./secrets-scanner -exclude-ext "_test.go,.test.js,.spec.ts"
 
-  CI/CD with JSON output:
-    ./secrets-scanner -path . -json -severity CRITICAL > secrets.json
+  Scan config files only:
+    ./secrets-scanner -include-ext ".yaml,.yml,.json,.env"
 
-  Maximum performance scan:
+  High severity + JSON output for CI/CD:
+    ./secrets-scanner -path . -severity HIGH -json > report.json
+
+  Maximum performance (all CPU cores):
     ./secrets-scanner -workers 0 -severity LOW
 
-SUPPORTED CATEGORIES:
-  • PII          - Email, Phone, SSN, CMND/CCCD, MAC, IP
-  • Finance      - Credit cards (Visa/MC/Amex), IBAN, Bitcoin, Ethereum
-  • Cloud        - AWS, Azure, GCP, DigitalOcean, Heroku
-  • API Keys     - GitHub, GitLab, Slack, OpenAI, Stripe, etc.
-  • Cryptographic- RSA, EC, DSA, PGP, SSH, PKCS#8 keys
-  • Database     - MySQL, PostgreSQL, MongoDB, Redis connections
-  • Healthcare   - NPI, DEA, ICD-10, BHYT (Vietnam)
-  • Infrastructure - Firebase, AWS S3 URLs
+  Scan specific file:
+    ./secrets-scanner -path ./config/database.yml
 
-For more information, visit: https://github.com/yourusername/secrets-scanner
+═══════════════════════════════════════════════════════════════════
+SUPPORTED DETECTION CATEGORIES (100+ Patterns)
+═══════════════════════════════════════════════════════════════════
+
+  PII              - Email, Phone (US/VN), SSN, CMND/CCCD, MAC, IPv4/IPv6
+  Finance          - Visa, Mastercard, Amex, IBAN, Bitcoin, Ethereum
+  Cloud            - AWS (AKIA/ASIA), Azure, GCP, DigitalOcean, Heroku
+  Source Control   - GitHub (ghp/gho/ghu/ghs), GitLab
+  Cryptographic    - RSA, EC, DSA, PGP, SSH, PKCS#8, X.509 keys
+  Payment          - Stripe, PayPal, Square
+  Messaging        - Slack, Discord, Telegram, Twilio
+  AI/ML            - OpenAI, Anthropic, Hugging Face
+  Healthcare       - NPI, DEA, ICD-10, BHYT (Vietnam)
+  Database         - MySQL, PostgreSQL, MongoDB, Redis, SQL Server
+  Infrastructure   - Firebase, AWS S3
+
+═══════════════════════════════════════════════════════════════════
+
+For more information: https://github.com/yourusername/secrets-scanner
 `)
 }
 
@@ -384,7 +472,7 @@ For more information, visit: https://github.com/yourusername/secrets-scanner
 func buildExtensions(include, exclude string) map[string]bool {
 	// Start with default extensions
 	extensions := make(map[string]bool)
-	
+
 	// If include is specified, use only those extensions
 	if include != "" {
 		for _, ext := range strings.Split(include, ",") {
@@ -401,7 +489,7 @@ func buildExtensions(include, exclude string) map[string]bool {
 		// Use default extensions
 		extensions = scanner.ScannableExtensions
 	}
-	
+
 	// Remove excluded extensions
 	if exclude != "" {
 		for _, ext := range strings.Split(exclude, ",") {
@@ -414,6 +502,6 @@ func buildExtensions(include, exclude string) map[string]bool {
 			}
 		}
 	}
-	
+
 	return extensions
 }
