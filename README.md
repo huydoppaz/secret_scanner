@@ -76,6 +76,15 @@ GOOS=windows GOARCH=amd64 go build -o secrets-scanner.exe main.go
 
 # List all detection patterns
 ./secrets-scanner -patterns
+
+# Include only specific extensions
+./secrets-scanner -include-ext ".go,.js,.py"
+
+# Exclude specific extensions
+./secrets-scanner -exclude-ext ".log,.tmp,.md"
+
+# Combine include and exclude
+./secrets-scanner -include-ext ".go,.js" -exclude-ext ".test.js"
 ```
 
 ### Examples
@@ -89,6 +98,12 @@ GOOS=windows GOARCH=amd64 go build -o secrets-scanner.exe main.go
 
 # Scan only critical secrets
 ./secrets-scanner -path ./src -severity CRITICAL
+
+# Scan only Go and JavaScript files
+./secrets-scanner -path ./src -include-ext ".go,.js"
+
+# Scan all files except logs and tests
+./secrets-scanner -path ./src -exclude-ext ".log,.test.js,_test.go"
 ```
 
 ## Package Structure

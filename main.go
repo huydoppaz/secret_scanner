@@ -27,6 +27,8 @@ func main() {
 		jsonOutput   = flag.Bool("json", false, "Output results as JSON")
 		showSummary  = flag.Bool("summary", true, "Show summary statistics")
 		listPatterns = flag.Bool("patterns", false, "List all detection patterns")
+		includeExts  = flag.String("include-ext", "", "Comma-separated file extensions to include (e.g., '.go,.js,.py')")
+		excludeExts  = flag.String("exclude-ext", "", "Comma-separated file extensions to exclude (e.g., '.log,.tmp')")
 	)
 	flag.Parse()
 
@@ -51,17 +53,26 @@ func main() {
 	// Parse severity
 	severity := parseSeverity(*minSeverity)
 
+	// Parse extensions
+	extensions := buildExtensions(*includeExts, *excludeExts)
+
 	// Print scan info
 	if !*jsonOutput {
 		printBanner()
 		color.Cyan("📁 Scanning: %s", absPath)
 		color.Cyan("🔍 Minimum severity: %s", *minSeverity)
 		color.Cyan("🧵 Workers: %d", *workers)
+		if *includeExts != "" {
+			color.Cyan("📎 Include extensions: %s", *includeExts)
+		}
+		if *excludeExts != "" {
+			color.Cyan("🚫 Exclude extensions: %s", *excludeExts)
+		}
 		fmt.Println()
 	}
 
-	// Create scanner
-	s := scanner.NewSecretsScanner(severity, *workers, 0, nil, nil)
+	// Create scanner with custom extensions
+	s := scanner.NewSecretsScanner(severity, *workers, 0, extensions, nil)
 
 	// Set up progress callback for non-JSON mode
 	if !*jsonOutput {
@@ -252,4 +263,42 @@ func printPatterns() {
 // Helper function for quick detection
 func detectInContent(content string, filePath string) []map[string]interface{} {
 	return detector.DetectSecretsFast(content, filePath, patterns.SeverityHIGH)
+}
+
+// buildExtensions builds the extension map from include/exclude flags
+func buildExtensions(include, exclude string) map[string]bool {
+	// Start with default extensions
+	extensions := make(map[string]bool)
+	
+	// If include is specified, use only those extensions
+	if include != "" {
+		for _, ext := range strings.Split(include, ",") {
+			ext := strings.TrimSpace(ext)
+			if ext != "" {
+				// Ensure extension starts with .
+				if !strings.HasPrefix(ext, ".") {
+					ext = "." + ext
+				}
+				extensions[strings.ToLower(ext)] = true
+			}
+		}
+	} else {
+		// Use default extensions
+		extensions = scanner.ScannableExtensions
+	}
+	
+	// Remove excluded extensions
+	if exclude != "" {
+		for _, ext := range strings.Split(exclude, ",") {
+			ext := strings.TrimSpace(ext)
+			if ext != "" {
+				if !strings.HasPrefix(ext, ".") {
+					ext = "." + ext
+				}
+				delete(extensions, strings.ToLower(ext))
+			}
+		}
+	}
+	
+	return extensions
 }
