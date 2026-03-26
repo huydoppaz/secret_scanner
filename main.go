@@ -29,8 +29,15 @@ func main() {
 		listPatterns = flag.Bool("patterns", false, "List all detection patterns")
 		includeExts  = flag.String("include-ext", "", "Comma-separated file extensions to include (e.g., '.go,.js,.py')")
 		excludeExts  = flag.String("exclude-ext", "", "Comma-separated file extensions to exclude (e.g., '.log,.tmp')")
+		showHelp     = flag.Bool("help", false, "Show detailed help information")
 	)
 	flag.Parse()
+
+	// Show detailed help
+	if *showHelp {
+		printDetailedHelp()
+		return
+	}
 
 	// List patterns mode
 	if *listPatterns {
@@ -263,6 +270,114 @@ func printPatterns() {
 // Helper function for quick detection
 func detectInContent(content string, filePath string) []map[string]interface{} {
 	return detector.DetectSecretsFast(content, filePath, patterns.SeverityHIGH)
+}
+
+// printDetailedHelp prints comprehensive help information
+func printDetailedHelp() {
+	fmt.Println(`
+SECRETS SCANNER - Fast Secret Detection Tool
+
+DESCRIPTION:
+  A high-performance Go-based tool for detecting secrets, API keys, passwords,
+  and sensitive data in source code and configuration files.
+
+USAGE:
+  secrets-scanner [OPTIONS]
+
+INPUT:
+  -path string          Directory or file path to scan (default: ".")
+                        Examples: 
+                          -path ./src
+                          -path /var/www/app
+                          -path config.yaml
+
+OPTIONS:
+  -severity string      Minimum severity level (default: "HIGH")
+                        Values: CRITICAL, HIGH, MEDIUM, LOW
+                        Example: -severity CRITICAL
+
+  -workers int          Number of concurrent worker threads (default: 8)
+                        Auto-detected to CPU cores if set to 0
+                        Example: -workers 16
+
+  -include-ext string   Comma-separated file extensions to scan
+                        Overrides default extensions
+                        Example: -include-ext ".go,.js,.py,.yaml"
+
+  -exclude-ext string   Comma-separated file extensions to skip
+                        Removes from default or include list
+                        Example: -exclude-ext ".log,.tmp,.md"
+
+  -json                 Output results in JSON format (default: false)
+                        Useful for CI/CD integration
+                        Example: -json > results.json
+
+  -summary              Show summary statistics (default: true)
+                        Use -summary=false to disable
+
+  -patterns             List all 100+ detection patterns and exit
+                        Example: -patterns
+
+  -help                 Show this detailed help message
+
+OUTPUT:
+  Console output includes:
+    • Scan progress and file count
+    • Detected secrets with severity, category, file location
+    • Masked secret values (shows first/last 4 chars)
+    • Summary statistics by severity and category
+    • Scan duration
+
+  JSON Output Structure:
+    {
+      "status": "completed",
+      "findings": [...],
+      "files_scanned": 150,
+      "files_with_secrets": 5,
+      "scan_duration": 2.35,
+      "summary": {
+        "total": 12,
+        "by_severity": {"critical": 2, "high": 5, "medium": 3, "low": 2},
+        "by_category": {"AWS": 3, "GitHub": 2, ...}
+      }
+    }
+
+EXIT CODES:
+    0  No secrets detected
+    1  Secrets detected or error occurred
+
+EXAMPLES:
+
+  Basic scan:
+    ./secrets-scanner
+
+  Scan specific directory with high severity:
+    ./secrets-scanner -path ./src -severity HIGH
+
+  Scan only Go files:
+    ./secrets-scanner -include-ext ".go"
+
+  Exclude test files:
+    ./secrets-scanner -exclude-ext "_test.go,.test.js"
+
+  CI/CD with JSON output:
+    ./secrets-scanner -path . -json -severity CRITICAL > secrets.json
+
+  Maximum performance scan:
+    ./secrets-scanner -workers 0 -severity LOW
+
+SUPPORTED CATEGORIES:
+  • PII          - Email, Phone, SSN, CMND/CCCD, MAC, IP
+  • Finance      - Credit cards (Visa/MC/Amex), IBAN, Bitcoin, Ethereum
+  • Cloud        - AWS, Azure, GCP, DigitalOcean, Heroku
+  • API Keys     - GitHub, GitLab, Slack, OpenAI, Stripe, etc.
+  • Cryptographic- RSA, EC, DSA, PGP, SSH, PKCS#8 keys
+  • Database     - MySQL, PostgreSQL, MongoDB, Redis connections
+  • Healthcare   - NPI, DEA, ICD-10, BHYT (Vietnam)
+  • Infrastructure - Firebase, AWS S3 URLs
+
+For more information, visit: https://github.com/yourusername/secrets-scanner
+`)
 }
 
 // buildExtensions builds the extension map from include/exclude flags
