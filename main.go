@@ -5,12 +5,15 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/fatih/color"
 
@@ -22,6 +25,8 @@ import (
 func main() {
 	var (
 		path         = flag.String("path", ".", "Directory or file path to scan")
+		stdin        = flag.Bool("stdin", false, "Read content from stdin instead of file")
+		stdinName    = flag.String("stdin-name", "stdin", "Filename to use for stdin input")
 		minSeverity  = flag.String("severity", "HIGH", "Minimum severity (CRITICAL, HIGH, MEDIUM, LOW)")
 		workers      = flag.Int("workers", 8, "Number of worker threads")
 		jsonOutput   = flag.Bool("json", false, "Output results as JSON")
@@ -42,6 +47,15 @@ func main() {
 	// List patterns mode
 	if *listPatterns {
 		printPatterns()
+		return
+	}
+
+	// Stdin mode - read from pipe
+	if *stdin {
+		result := scanStdin(*stdinName, parseSeverity(*minSeverity), *jsonOutput, *showSummary)
+		if len(result.Findings) > 0 {
+			os.Exit(1)
+		}
 		return
 	}
 
@@ -298,6 +312,18 @@ INPUT OPTIONS
         -path config.yaml
         -path ./main.go
 
+  -stdin
+      Read content from stdin (pipe mode)
+      Useful for pipeline integration
+      Examples:
+        cat config.yaml | ./secrets-scanner -stdin
+        curl http://example.com/config | ./secrets-scanner -stdin -json
+
+  -stdin-name string
+      Filename to display in output when using -stdin
+      Default: "stdin"
+      Example: -stdin-name "config.yaml"
+
 ═══════════════════════════════════════════════════════════════════
 FILTER OPTIONS (File Extensions)
 ═══════════════════════════════════════════════════════════════════
@@ -504,4 +530,53 @@ func buildExtensions(include, exclude string) map[string]bool {
 	}
 
 	return extensions
+}
+
+// scanStdin reads content from stdin and scans for secrets
+func scanStdin(filename string, minSeverity patterns.Severity, jsonOutput, showSummary bool) *scanner.ScanResult {
+	start := time.Now()
+
+	// Read from stdin
+	reader := bufio.NewReader(os.Stdin)
+	var content strings.Builder
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil && err != io.EOF {
+			break
+		}
+		content.WriteString(line)
+		if err == io.EOF {
+			break
+		}
+	}
+
+	// Detect secrets
+	findings := detector.DetectSecretsFast(content.String(), filename, minSeverity)
+
+	// Build result
+	result := &scanner.ScanResult{
+		Status:           "completed",
+		Findings:         findings,
+		FilesScanned:     1,
+		FilesWithSecrets: len(findings),
+		ScanDuration:     time.Since(start).Seconds(),
+		StartedAt:        start.Format(time.RFC3339),
+		CompletedAt:      time.Now().Format(time.RFC3339),
+	}
+
+	// Output
+	if jsonOutput {
+		outputJSON(result)
+	} else {
+		if len(findings) == 0 {
+			color.Green("✅ No secrets detected!")
+		} else {
+			color.Red("\n🚨 Found %d potential secret(s):\n", len(findings))
+			for i, finding := range findings {
+				printFinding(i+1, finding)
+			}
+		}
+	}
+
+	return result
 }
